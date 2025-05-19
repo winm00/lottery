@@ -6,6 +6,7 @@
     <title>Decentralized Lottery</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <style>
+        /* CSS remains the same as before */
         body {
             font-family: 'Arial', sans-serif;
             line-height: 1.6;
@@ -417,10 +418,15 @@
                 logDebug('Attempting to connect wallet...');
                 
                 if (window.ethereum) {
-                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    // Create provider without ENS support to avoid the error
+                    provider = new ethers.providers.Web3Provider(window.ethereum, {
+                        name: 'sepolia',
+                        chainId: 11155111,
+                        ensAddress: null // Disable ENS lookups
+                    });
                     
                     // Request account access
-                    const accounts = await provider.send("eth_requestAccounts", []);
+                    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
                     connectedAddress = accounts[0];
                     logDebug('Connected address', connectedAddress);
                     
@@ -444,14 +450,18 @@
                     connectWalletBtn.disabled = true;
                     
                     // Check if user is contract owner
-                    const owner = await contract.owner();
-                    logDebug('Contract owner', owner);
-                    
-                    if (owner.toLowerCase() === connectedAddress.toLowerCase()) {
-                        adminSection.style.display = 'block';
-                        logDebug('User is the contract owner, admin controls enabled');
-                    } else {
-                        logDebug('User is not the contract owner');
+                    try {
+                        const owner = await contract.owner();
+                        logDebug('Contract owner', owner);
+                        
+                        if (owner.toLowerCase() === connectedAddress.toLowerCase()) {
+                            adminSection.style.display = 'block';
+                            logDebug('User is the contract owner, admin controls enabled');
+                        } else {
+                            logDebug('User is not the contract owner');
+                        }
+                    } catch (error) {
+                        logDebug('Error checking owner:', error.message);
                     }
                     
                     // Setup event listeners for network changes
@@ -522,16 +532,24 @@
                 }
                 
                 // Get current players
-                const players = await contract.getPlayers();
-                logDebug('Current players', players);
-                updatePlayersList(players);
+                try {
+                    const players = await contract.getPlayers();
+                    logDebug('Current players', players);
+                    updatePlayersList(players);
+                    
+                    // Update participant count
+                    participantCount.textContent = players.length;
+                } catch (error) {
+                    logDebug('Error getting players:', error.message);
+                }
                 
                 // Get current balance
-                const balance = await provider.getBalance(CONTRACT_ADDRESS);
-                prizePool.textContent = ethers.utils.formatEther(balance) + ' ETH';
-                
-                // Update participant count
-                participantCount.textContent = players.length;
+                try {
+                    const balance = await provider.getBalance(CONTRACT_ADDRESS);
+                    prizePool.textContent = ethers.utils.formatEther(balance) + ' ETH';
+                } catch (error) {
+                    logDebug('Error getting balance:', error.message);
+                }
                 
                 logDebug('Lottery data refreshed successfully');
             } catch (error) {
@@ -595,33 +613,47 @@
                     return;
                 }
                 
-                // Estimate gas for the transaction
-                const gasEstimate = await contract.estimateGas.enter({
-                    value: ethers.utils.parseEther('0.001')
-                });
-                
-                logDebug('Gas estimate for enter()', gasEstimate.toString());
-                
-                // Send transaction with a 20% buffer on gas
-                const tx = await contract.enter({
-                    value: ethers.utils.parseEther('0.001'),
-                    gasLimit: gasEstimate.mul(120).div(100)
-                });
+                // Send transaction
+                let tx;
+                try {
+                    // Estimate gas for the transaction
+                    const gasEstimate = await contract.estimateGas.enter({
+                        value: ethers.utils.parseEther('0.001')
+                    });
+                    
+                    logDebug('Gas estimate for enter()', gasEstimate.toString());
+                    
+                    // Send transaction with a 20% buffer on gas
+                    tx = await contract.enter({
+                        value: ethers.utils.parseEther('0.001'),
+                        gasLimit: gasEstimate.mul(120).div(100)
+                    });
+                } catch (error) {
+                    showStatus('Error sending transaction: ' + error.message, 'error');
+                    logDebug('Transaction error', error.message);
+                    enterLotteryBtn.disabled = false;
+                    return;
+                }
                 
                 logDebug('Transaction submitted', tx.hash);
                 showStatus('Transaction submitted. Waiting for confirmation...', 'warning');
                 displayTransactionLink(tx.hash, 'Transaction submitted:');
                 
                 // Wait for confirmation
-                const receipt = await tx.wait();
-                logDebug('Transaction confirmed', receipt);
-                
-                if (receipt.status === 1) {
-                    showStatus('Successfully entered the lottery!', 'success');
-                    displayTransactionLink(tx.hash, 'Successfully entered the lottery:');
-                } else {
-                    showStatus('Transaction failed. Please try again.', 'error');
-                    logDebug('Transaction failed', receipt);
+                try {
+                    const receipt = await tx.wait();
+                    logDebug('Transaction confirmed', receipt);
+                    
+                    if (receipt.status === 1) {
+                        showStatus('Successfully entered the lottery!', 'success');
+                        displayTransactionLink(tx.hash, 'Successfully entered the lottery:');
+                    } else {
+                        showStatus('Transaction failed. Please try again.', 'error');
+                        logDebug('Transaction failed', receipt);
+                    }
+                } catch (error) {
+                    showStatus('Error waiting for confirmation: ' + error.message, 'error');
+                    logDebug('Confirmation error', error.message);
                 }
                 
                 await refreshLotteryData();
@@ -668,77 +700,85 @@
                     return;
                 }
                 
-                // Estimate gas for the transaction
-                let gasEstimate;
+                // Send transaction
+                let tx;
                 try {
-                    gasEstimate = await contract.estimateGas.pickWinner();
+                    // Estimate gas for the transaction
+                    const gasEstimate = await contract.estimateGas.pickWinner();
                     logDebug('Gas estimate for pickWinner()', gasEstimate.toString());
+                    
+                    // Send transaction with a 30% buffer on gas (increased from 20%)
+                    tx = await contract.pickWinner({
+                        gasLimit: gasEstimate.mul(130).div(100)
+                    });
                 } catch (error) {
-                    showStatus('Error estimating gas: ' + error.message, 'error');
-                    logDebug('Gas estimation error', error.message);
+                    showStatus('Error sending transaction: ' + error.message, 'error');
+                    logDebug('Transaction error', error.message);
                     pickWinnerBtn.disabled = false;
                     return;
                 }
-                
-                // Send transaction with a 20% buffer on gas
-                const tx = await contract.pickWinner({
-                    gasLimit: gasEstimate.mul(120).div(100)
-                });
                 
                 logDebug('Transaction submitted', tx.hash);
                 showStatus('Transaction submitted. Waiting for confirmation...', 'warning');
                 displayTransactionLink(tx.hash, 'Transaction submitted:');
                 
                 // Wait for confirmation
-                const receipt = await tx.wait();
-                logDebug('Transaction receipt', receipt);
-                
-                // Check if the transaction was successful
-                if (receipt.status === 1) {
-                    // Look for the WinnerPicked event in the logs
-                    const winnerPickedEvent = receipt.events?.find(event => 
-                        event.event === 'WinnerPicked' || 
-                        (event.topics && event.topics[0] === ethers.utils.id('WinnerPicked(address,uint256)'))
-                    );
+                try {
+                    const receipt = await tx.wait();
+                    logDebug('Transaction receipt', receipt);
                     
-                    if (winnerPickedEvent) {
-                        let winner, prize;
+                    // Check if the transaction was successful
+                    if (receipt.status === 1) {
+                        // Look for the WinnerPicked event in the logs
+                        let winnerFound = false;
                         
-                        // Parse the event differently depending on how it comes back
-                        if (winnerPickedEvent.args) {
-                            winner = winnerPickedEvent.args.winner;
-                            prize = ethers.utils.formatEther(winnerPickedEvent.args.prize);
-                        } else {
-                            // If args aren't available, parse from the data field
-                            const interface = new ethers.utils.Interface(CONTRACT_ABI);
-                            const parsedLog = interface.parseLog(winnerPickedEvent);
-                            winner = parsedLog.args.winner;
-                            prize = ethers.utils.formatEther(parsedLog.args.prize);
+                        for (const log of receipt.logs) {
+                            try {
+                                // Try to parse the log using the contract interface
+                                const parsedLog = contract.interface.parseLog(log);
+                                
+                                if (parsedLog.name === 'WinnerPicked') {
+                                    const winner = parsedLog.args.winner;
+                                    const prize = ethers.utils.formatEther(parsedLog.args.prize);
+                                    
+                                    logDebug('Winner picked', { winner, prize: prize + ' ETH' });
+                                    
+                                    if (winner.toLowerCase() === connectedAddress.toLowerCase()) {
+                                        showStatus(`Congratulations! You won ${prize} ETH! 🎉`, 'success');
+                                    } else {
+                                        showStatus(`Winner picked: ${winner.substring(0, 6)}...${winner.substring(38)} won ${prize} ETH!`, 'success');
+                                    }
+                                    
+                                    displayTransactionLink(tx.hash, 'Winner successfully picked:');
+                                    winnerFound = true;
+                                    break;
+                                }
+                            } catch (error) {
+                                // Failed to parse this log, try the next one
+                                continue;
+                            }
                         }
                         
-                        logDebug('Winner picked', { winner, prize: prize + ' ETH' });
-                        
-                        if (winner.toLowerCase() === connectedAddress.toLowerCase()) {
-                            showStatus(`Congratulations! You won ${prize} ETH! 🎉`, 'success');
-                        } else {
-                            showStatus(`Winner picked: ${winner.substring(0, 6)}...${winner.substring(38)} won ${prize} ETH!`, 'success');
+                        if (!winnerFound) {
+                            showStatus('Transaction successful, but winner event not found. Check transaction on explorer.', 'warning');
+                            logDebug('Winner event not found in logs');
                         }
                         
-                        displayTransactionLink(tx.hash, 'Winner successfully picked:');
+                        // Check contract balance after the transaction to verify funds were sent
+                        const afterBalance = await checkContractBalance();
+                        if (afterBalance.gt(0)) {
+                            showStatus('Warning: Contract still has balance after picking winner!', 'warning');
+                            logDebug('Contract still has balance', ethers.utils.formatEther(afterBalance) + ' ETH');
+                        } else {
+                            logDebug('Contract balance is now zero, funds were transferred');
+                        }
                     } else {
-                        showStatus('Winner picked, but event details could not be parsed.', 'warning');
-                        logDebug('Winner picked but event not found in logs');
+                        showStatus('Transaction failed. The winner was not picked.', 'error');
+                        logDebug('Transaction failed', receipt);
                     }
-                    
-                    // Check contract balance after the transaction to verify funds were sent
-                    const afterBalance = await checkContractBalance();
-                    if (afterBalance.gt(0)) {
-                        showStatus('Warning: Contract still has balance after picking winner!', 'warning');
-                        logDebug('Contract still has balance', ethers.utils.formatEther(afterBalance) + ' ETH');
-                    }
-                } else {
-                    showStatus('Transaction failed. The winner was not picked.', 'error');
-                    logDebug('Transaction failed', receipt);
+                } catch (error) {
+                    showStatus('Error waiting for confirmation: ' + error.message, 'error');
+                    logDebug('Confirmation error', error.message);
                 }
                 
                 await refreshLotteryData();
@@ -768,48 +808,47 @@
         function setupEventListeners() {
             logDebug('Setting up event listeners...');
             
-            // Remove any existing listeners to prevent duplicates
-            if (contract.listeners('LotteryEntered').length > 0) {
-                contract.removeAllListeners('LotteryEntered');
-            }
-            if (contract.listeners('WinnerPicked').length > 0) {
-                contract.removeAllListeners('WinnerPicked');
-            }
-            
-            contract.on("LotteryEntered", async (player, amount, event) => {
-                logDebug('LotteryEntered event', { 
-                    player, 
-                    amount: ethers.utils.formatEther(amount) + ' ETH',
-                    transactionHash: event.transactionHash
-                });
+            try {
+                // Remove any existing listeners to prevent duplicates
+                contract.removeAllListeners();
                 
-                await refreshLotteryData();
-                
-                if (player.toLowerCase() !== connectedAddress.toLowerCase()) {
-                    showStatus(`New participant: ${player.substring(0, 6)}...${player.substring(38)}`, 'success');
-                }
-            });
-            
-            contract.on("WinnerPicked", async (winner, prize, event) => {
-                logDebug('WinnerPicked event', { 
-                    winner, 
-                    prize: ethers.utils.formatEther(prize) + ' ETH',
-                    transactionHash: event.transactionHash
-                });
-                
-                await refreshLotteryData();
-                
-                // Only display notification if the user didn't trigger this event themselves
-                if (event.transactionHash !== lastPickWinnerTxHash) {
-                    if (winner.toLowerCase() === connectedAddress.toLowerCase()) {
-                        showStatus(`Congratulations! You won ${ethers.utils.formatEther(prize)} ETH! 🎉`, 'success');
-                    } else {
-                        showStatus(`Winner picked: ${winner.substring(0, 6)}...${winner.substring(38)} won ${ethers.utils.formatEther(prize)} ETH!`, 'warning');
+                contract.on("LotteryEntered", (player, amount, event) => {
+                    logDebug('LotteryEntered event', { 
+                        player, 
+                        amount: ethers.utils.formatEther(amount) + ' ETH',
+                        transactionHash: event.transactionHash
+                    });
+                    
+                    refreshLotteryData();
+                    
+                    if (player.toLowerCase() !== connectedAddress.toLowerCase()) {
+                        showStatus(`New participant: ${player.substring(0, 6)}...${player.substring(38)}`, 'success');
                     }
-                }
-            });
-            
-            logDebug('Event listeners set up successfully');
+                });
+                
+                contract.on("WinnerPicked", (winner, prize, event) => {
+                    logDebug('WinnerPicked event', { 
+                        winner, 
+                        prize: ethers.utils.formatEther(prize) + ' ETH',
+                        transactionHash: event.transactionHash
+                    });
+                    
+                    refreshLotteryData();
+                    
+                    // Only display notification if the user didn't trigger this event themselves
+                    if (event.transactionHash !== lastPickWinnerTxHash) {
+                        if (winner.toLowerCase() === connectedAddress.toLowerCase()) {
+                            showStatus(`Congratulations! You won ${ethers.utils.formatEther(prize)} ETH! 🎉`, 'success');
+                        } else {
+                            showStatus(`Winner picked: ${winner.substring(0, 6)}...${winner.substring(38)} won ${ethers.utils.formatEther(prize)} ETH!`, 'warning');
+                        }
+                    }
+                });
+                
+                logDebug('Event listeners set up successfully');
+            } catch (error) {
+                logDebug('Error setting up event listeners', error.message);
+            }
         }
         
         // Toggle debug information display
@@ -829,8 +868,7 @@
         
         pickWinnerBtn.addEventListener('click', async () => {
             try {
-                const tx = await contract.pickWinner();
-                lastPickWinnerTxHash = tx.hash;
+                // Call pickWinner directly - the function handles the transaction
                 await pickWinner();
             } catch (error) {
                 console.error('Error in pickWinner click handler:', error);

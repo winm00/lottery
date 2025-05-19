@@ -398,8 +398,8 @@
     </div>
 
     <script>
-        // Contract details - REMEMBER TO REPLACE WITH YOUR CONTRACT ADDRESS
-        const CONTRACT_ADDRESS = 'YOUR_CONTRACT_ADDRESS_HERE';
+        // Contract details - REPLACE WITH YOUR CONTRACT ADDRESS
+        const CONTRACT_ADDRESS = '0x1339ab6B2C02f826327CCECC7D2384F628d2B230'; 
         const CONTRACT_ABI = [
             {
                 "inputs": [
@@ -543,15 +543,11 @@
         async function connectWallet() {
             try {
                 if (window.ethereum) {
-                    // Create provider without ENS to avoid errors on Sepolia
-                    provider = new ethers.providers.Web3Provider(window.ethereum, {
-                        name: 'sepolia',
-                        chainId: 11155111,
-                        ensAddress: null 
-                    });
+                    // Create a vanilla provider without network specifics to avoid ENS errors
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
                     
                     // Request account access
-                    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                     userAddress = accounts[0];
                     
                     signer = provider.getSigner();
@@ -566,9 +562,14 @@
                     connectWalletBtn.disabled = true;
                     
                     // Check if user is owner
-                    const owner = await contract.owner();
-                    if (owner.toLowerCase() === userAddress.toLowerCase()) {
-                        adminSection.style.display = 'block';
+                    try {
+                        const owner = await contract.owner();
+                        if (owner.toLowerCase() === userAddress.toLowerCase()) {
+                            adminSection.style.display = 'block';
+                        }
+                    } catch (error) {
+                        console.error("Error checking owner:", error);
+                        showStatus('Connected but could not verify ownership.', 'warning');
                     }
                     
                     // Listen for account/network changes
@@ -612,17 +613,28 @@
                 }
                 
                 // Get current players
-                const players = await contract.getPlayers();
-                updatePlayersList(players);
+                try {
+                    const players = await contract.getPlayers();
+                    updatePlayersList(players);
+                    
+                    // Update player count
+                    playerCount.textContent = players.length;
+                } catch (error) {
+                    console.error("Error getting players:", error);
+                    showStatus('Unable to retrieve players list.', 'warning');
+                }
                 
                 // Get current balance (prize pool)
-                const balance = await provider.getBalance(CONTRACT_ADDRESS);
-                prizePool.textContent = ethers.utils.formatEther(balance) + ' ETH';
-                
-                // Update player count
-                playerCount.textContent = players.length;
+                try {
+                    const balance = await provider.getBalance(CONTRACT_ADDRESS);
+                    prizePool.textContent = ethers.utils.formatEther(balance) + ' ETH';
+                } catch (error) {
+                    console.error("Error getting balance:", error);
+                    showStatus('Unable to retrieve prize pool amount.', 'warning');
+                }
             } catch (error) {
                 console.error('Error updating lottery info:', error);
+                showStatus('Error refreshing lottery data.', 'error');
             }
         }
         
@@ -657,31 +669,41 @@
                 showStatus('Entering lottery...', 'warning');
                 
                 // Check if already entered
-                const players = await contract.getPlayers();
-                const alreadyEntered = players.some(
-                    player => player.toLowerCase() === userAddress.toLowerCase()
-                );
-                
-                if (alreadyEntered) {
-                    showStatus('You are already in this lottery!', 'warning');
-                    enterLotteryBtn.disabled = false;
-                    return;
+                try {
+                    const players = await contract.getPlayers();
+                    const alreadyEntered = players.some(
+                        player => player.toLowerCase() === userAddress.toLowerCase()
+                    );
+                    
+                    if (alreadyEntered) {
+                        showStatus('You are already in this lottery!', 'warning');
+                        enterLotteryBtn.disabled = false;
+                        return;
+                    }
+                } catch (error) {
+                    console.error("Error checking if already entered:", error);
+                    // Continue anyway since this is just a check
                 }
                 
                 // Send transaction
-                const tx = await contract.enter({
-                    value: ethers.utils.parseEther('0.001')
-                });
-                
-                showStatus('Transaction sent! Waiting for confirmation...', 'warning');
-                
-                // Wait for confirmation
-                const receipt = await tx.wait();
-                
-                if (receipt.status === 1) {
-                    showStatus('You have entered the lottery! Good luck! 🍀', 'success');
-                } else {
-                    showStatus('Transaction failed. Please try again.', 'error');
+                try {
+                    const tx = await contract.enter({
+                        value: ethers.utils.parseEther('0.001')
+                    });
+                    
+                    showStatus('Transaction sent! Waiting for confirmation...', 'warning');
+                    
+                    // Wait for confirmation
+                    const receipt = await tx.wait();
+                    
+                    if (receipt.status === 1) {
+                        showStatus('You have entered the lottery! Good luck! 🍀', 'success');
+                    } else {
+                        showStatus('Transaction failed. Please try again.', 'error');
+                    }
+                } catch (error) {
+                    console.error("Transaction error:", error);
+                    showStatus('Transaction failed: ' + (error.reason || error.message), 'error');
                 }
                 
                 await updateLotteryInfo();
@@ -700,25 +722,37 @@
                 showStatus('Picking a winner...', 'warning');
                 
                 // Check if there are players
-                const players = await contract.getPlayers();
-                if (players.length === 0) {
-                    showStatus('No players in the lottery!', 'error');
+                try {
+                    const players = await contract.getPlayers();
+                    if (players.length === 0) {
+                        showStatus('No players in the lottery!', 'error');
+                        pickWinnerBtn.disabled = false;
+                        return;
+                    }
+                } catch (error) {
+                    console.error("Error checking players:", error);
+                    showStatus('Error checking players. Try again.', 'error');
                     pickWinnerBtn.disabled = false;
                     return;
                 }
                 
                 // Send transaction
-                const tx = await contract.pickWinner();
-                
-                showStatus('Transaction sent! Waiting for confirmation...', 'warning');
-                
-                // Wait for confirmation
-                const receipt = await tx.wait();
-                
-                if (receipt.status === 1) {
-                    showStatus('Winner has been picked! Check your wallet for winnings. 🎉', 'success');
-                } else {
-                    showStatus('Transaction failed. Please try again.', 'error');
+                try {
+                    const tx = await contract.pickWinner();
+                    
+                    showStatus('Transaction sent! Waiting for confirmation...', 'warning');
+                    
+                    // Wait for confirmation
+                    const receipt = await tx.wait();
+                    
+                    if (receipt.status === 1) {
+                        showStatus('Winner has been picked! Check your wallet for winnings. 🎉', 'success');
+                    } else {
+                        showStatus('Transaction failed. Please try again.', 'error');
+                    }
+                } catch (error) {
+                    console.error("Transaction error:", error);
+                    showStatus('Transaction failed: ' + (error.reason || error.message), 'error');
                 }
                 
                 await updateLotteryInfo();
@@ -744,25 +778,32 @@
         
         // Setup event listeners for contract events
         function setupEventListeners() {
-            // Listen for new players
-            contract.on("LotteryEntered", (player, amount) => {
-                updateLotteryInfo();
-                if (player.toLowerCase() !== userAddress.toLowerCase()) {
-                    showStatus(`New player entered the lottery!`, 'success');
-                }
-            });
-            
-            // Listen for winner picked
-            contract.on("WinnerPicked", (winner, prize) => {
-                updateLotteryInfo();
-                const prizeEth = ethers.utils.formatEther(prize);
+            try {
+                // Clear any existing listeners
+                contract.removeAllListeners();
+
+                // Listen for new players
+                contract.on("LotteryEntered", (player, amount) => {
+                    updateLotteryInfo();
+                    if (player.toLowerCase() !== userAddress.toLowerCase()) {
+                        showStatus(`New player entered the lottery!`, 'success');
+                    }
+                });
                 
-                if (winner.toLowerCase() === userAddress.toLowerCase()) {
-                    showStatus(`Congratulations! You won ${prizeEth} ETH! 🎉`, 'success');
-                } else {
-                    showStatus(`Winner has been picked and won ${prizeEth} ETH!`, 'warning');
-                }
-            });
+                // Listen for winner picked
+                contract.on("WinnerPicked", (winner, prize) => {
+                    updateLotteryInfo();
+                    const prizeEth = ethers.utils.formatEther(prize);
+                    
+                    if (winner.toLowerCase() === userAddress.toLowerCase()) {
+                        showStatus(`Congratulations! You won ${prizeEth} ETH! 🎉`, 'success');
+                    } else {
+                        showStatus(`Winner has been picked and won ${prizeEth} ETH!`, 'warning');
+                    }
+                });
+            } catch (error) {
+                console.error("Error setting up event listeners:", error);
+            }
         }
         
         // Button click event listeners
@@ -774,13 +815,15 @@
         window.addEventListener('load', async () => {
             if (window.ethereum) {
                 try {
-                    const accounts = await ethereum.request({ method: 'eth_accounts' });
+                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
                     if (accounts.length > 0) {
                         await connectWallet();
                     }
                 } catch (error) {
                     console.error(error);
                 }
+            } else {
+                showStatus('MetaMask not detected. Please install it to use this app.', 'error');
             }
         });
     </script>

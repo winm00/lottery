@@ -3,214 +3,403 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Decentralized Lottery</title>
+    <title>CryptoLuck Lottery</title>
+    <!-- Import ethers.js library -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <style>
+        /* Custom color scheme */
+        :root {
+            --primary: #6c63ff;
+            --primary-dark: #5a52d9;
+            --secondary: #ffd166;
+            --success: #06d6a0;
+            --error: #ef476f;
+            --warning: #ffc43d;
+            --text: #2b2d42;
+            --background: #f1f3f8;
+            --card: #ffffff;
+            --accent: #9381ff;
+        }
+
+        /* Base styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
         body {
-            font-family: 'Arial', sans-serif;
+            background-color: var(--background);
+            color: var(--text);
             line-height: 1.6;
-            max-width: 800px;
-            margin: 0 auto;
             padding: 20px;
-            color: #333;
-            background-color: #f9f9f9;
         }
-        .container {
-            background-color: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+        .app-container {
+            max-width: 700px;
+            margin: 0 auto;
         }
-        h1 {
-            color: #2c3e50;
+
+        /* Header with custom logo */
+        .app-header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
+            padding-top: 20px;
         }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+        }
+
+        .logo span {
+            color: var(--secondary);
+        }
+
+        .tagline {
+            font-style: italic;
+            color: #777;
+            margin-bottom: 20px;
+        }
+
+        /* Main card with custom design */
+        .lottery-card {
+            background-color: var(--card);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+            border-top: 5px solid var(--primary);
+        }
+
         .info-box {
-            background-color: #f8f9fa;
-            border-left: 4px solid #6c5ce7;
+            background-color: rgba(108, 99, 255, 0.08);
+            border-left: 4px solid var(--primary);
             padding: 15px;
             margin-bottom: 20px;
             border-radius: 4px;
         }
-        .button {
-            background-color: #6c5ce7;
-            color: white;
+
+        /* Custom buttons */
+        .btn {
             border: none;
-            padding: 12px 20px;
-            border-radius: 5px;
+            border-radius: 8px;
+            padding: 12px 18px;
             cursor: pointer;
-            font-size: 16px;
-            margin: 10px 0;
-            transition: background-color 0.3s;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            margin: 8px 0;
             width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
         }
-        .button:hover {
-            background-color: #5649c0;
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
         }
-        .button:disabled {
-            background-color: #ccc;
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 99, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            background-color: #ebc254;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 209, 102, 0.4);
+        }
+
+        .btn:disabled {
+            background-color: #cccccc;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
+
+        /* Cool icons for buttons */
+        .icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .wallet-icon {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M21 4H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-1 12h-3v-2h3v2z'/%3E%3C/svg%3E");
+        }
+
+        .enter-icon {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z'/%3E%3C/svg%3E");
+        }
+
+        .winner-icon {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232b2d42'%3E%3Cpath d='M12 2L8.5 8.5 2 9.8l5 4.9-1.2 6.9 6.2-3.2 6.2 3.2-1.2-6.9 5-4.9-6.5-1.3z'/%3E%3C/svg%3E");
+        }
+
+        /* Status styles */
         .status {
-            padding: 15px;
-            margin-top: 20px;
-            border-radius: 5px;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 8px;
             font-weight: 500;
+            position: relative;
+            padding-left: 35px;
         }
+
+        .status::before {
+            content: "";
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+
         .success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background-color: rgba(6, 214, 160, 0.1);
+            color: var(--success);
+            border: 1px solid var(--success);
         }
+
+        .success::before {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2306d6a0'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z'/%3E%3C/svg%3E");
+        }
+
         .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background-color: rgba(239, 71, 111, 0.1);
+            color: var(--error);
+            border: 1px solid var(--error);
         }
+
+        .error::before {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ef476f'%3E%3Cpath d='M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z'/%3E%3C/svg%3E");
+        }
+
         .warning {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
+            background-color: rgba(255, 196, 61, 0.1);
+            color: #b38a28;
+            border: 1px solid var(--warning);
         }
-        .player-list {
-            margin-top: 20px;
-            max-height: 200px;
+
+        .warning::before {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffc43d'%3E%3Cpath d='M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z'/%3E%3C/svg%3E");
+        }
+
+        /* Stats display */
+        .stats-container {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+            gap: 15px;
+        }
+
+        .stat-box {
+            flex: 1;
+            background: rgb(108,99,255);
+            background: linear-gradient(145deg, rgba(108,99,255,0.8) 0%, rgba(147,129,255,0.8) 100%);
+            color: white;
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(108, 99, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-box::after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%);
+            opacity: 0.5;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        /* Players list */
+        .players-section {
+            margin-top: 25px;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::before {
+            content: "";
+            display: inline-block;
+            width: 5px;
+            height: 18px;
+            background-color: var(--primary);
+            border-radius: 3px;
+        }
+
+        .players-list {
+            max-height: 180px;
             overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            border: 1px solid #eee;
+            border-radius: 8px;
             padding: 10px;
+            background-color: rgba(255, 255, 255, 0.5);
         }
+
         .player-item {
-            padding: 8px;
+            padding: 8px 10px;
             border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+            border-radius: 4px;
         }
+
         .player-item:last-child {
             border-bottom: none;
         }
-        .lottery-stats {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-            gap: 10px;
+
+        .your-entry {
+            background-color: rgba(108, 99, 255, 0.1);
+            border-left: 3px solid var(--primary);
         }
-        .stat-box {
-            flex: 1;
-            background-color: #e9f7fe;
-            padding: 15px;
-            border-radius: 5px;
+
+        /* Admin section */
+        .admin-section {
+            margin-top: 20px;
+            border-top: 1px dashed #ddd;
+            padding-top: 20px;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            background-color: var(--accent);
+            color: white;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        /* Footer */
+        .app-footer {
             text-align: center;
-            border: 1px solid #c5e8fc;
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: #777;
         }
-        .stat-value {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #4a5568;
-        }
-        .debug-box {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 14px;
-            display: none;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .transaction-link {
-            color: #6c5ce7;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .transaction-link:hover {
-            text-decoration: underline;
-        }
-        .network-warning {
-            background-color: #ff8a80;
-            color: #fff;
-            padding: 15px;
-            margin-top: 20px;
-            border-radius: 5px;
-            text-align: center;
-            font-weight: bold;
-            display: none;
-        }
+
+        /* Make it responsive */
         @media (max-width: 600px) {
-            .lottery-stats {
+            .stats-container {
                 flex-direction: column;
+                gap: 10px;
+            }
+            
+            .lottery-card {
+                padding: 15px;
+            }
+            
+            .logo {
+                font-size: 2rem;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Decentralized Lottery</h1>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">Crypto<span>Luck</span></div>
+            <p class="tagline">Try your luck and win big with Ethereum!</p>
+        </header>
         
-        <div class="info-box">
-            <p><strong>How it works:</strong> Enter the lottery by paying 0.001 ETH. When the lottery owner picks a winner, one random participant will receive the entire prize pool!</p>
-        </div>
-        
-        <div id="network-warning" class="network-warning">
-            You are on the wrong network. Please switch to Sepolia Testnet.
-        </div>
-        
-        <div id="connection-status" class="status warning">
-            Please connect your wallet to continue...
-        </div>
-        
-        <button id="connect-wallet" class="button">Connect Wallet</button>
-        
-        <div class="lottery-stats">
-            <div class="stat-box">
-                <p>Prize Pool</p>
-                <div id="prize-pool" class="stat-value">0 ETH</div>
+        <main class="lottery-card">
+            <div class="info-box">
+                <p><strong>How it works:</strong> Enter the lottery by sending 0.001 ETH. When the owner picks a winner, all the ETH in the pool goes to one lucky player!</p>
             </div>
-            <div class="stat-box">
-                <p>Participants</p>
-                <div id="participant-count" class="stat-value">0</div>
+            
+            <div id="connection-status" class="status warning">
+                Connect your wallet to join the fun!
             </div>
-            <div class="stat-box">
-                <p>Network</p>
-                <div id="network-name" class="stat-value">-</div>
-            </div>
-        </div>
-        
-        <button id="enter-lottery" class="button" disabled>Enter Lottery (0.001 ETH)</button>
-        
-        <div id="admin-section" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
-            <h3>Admin Controls</h3>
-            <button id="pick-winner" class="button">Pick Winner</button>
-        </div>
-        
-        <h3>Current Participants</h3>
-        <div id="players-list" class="player-list">
-            <p>No participants yet.</p>
-        </div>
-        
-        <div id="status-message"></div>
-        
-        <div id="transaction-info" style="margin-top: 20px;"></div>
-        
-        <div id="debug-box" class="debug-box"></div>
-        
-        <p style="margin-top: 30px; text-align: center;">
-            <button id="toggle-debug" class="button" style="width: auto; font-size: 12px; padding: 8px 15px;">
-                Show Debug Info
+            
+            <button id="connect-wallet" class="btn btn-primary">
+                <span class="icon wallet-icon"></span>
+                Connect Wallet
             </button>
-        </p>
+            
+            <div class="stats-container">
+                <div class="stat-box">
+                    <div class="stat-label">PRIZE POOL</div>
+                    <div id="prize-pool" class="stat-value">0 ETH</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">PLAYERS</div>
+                    <div id="player-count" class="stat-value">0</div>
+                </div>
+            </div>
+            
+            <button id="enter-lottery" class="btn btn-primary" disabled>
+                <span class="icon enter-icon"></span>
+                Enter Lottery (0.001 ETH)
+            </button>
+            
+            <div id="admin-section" class="admin-section" style="display: none;">
+                <h3 class="section-title">Admin Controls <span class="admin-badge">Owner Only</span></h3>
+                <button id="pick-winner" class="btn btn-secondary">
+                    <span class="icon winner-icon"></span>
+                    Pick Winner
+                </button>
+            </div>
+            
+            <div class="players-section">
+                <h3 class="section-title">Current Players</h3>
+                <div id="players-list" class="players-list">
+                    <p>No players yet. Be the first to enter!</p>
+                </div>
+            </div>
+            
+            <div id="status-message"></div>
+        </main>
+        
+        <footer class="app-footer">
+            <p>© 2025 CryptoLuck - Created for my blockchain assignment</p>
+        </footer>
     </div>
 
     <script>
-        // Contract Constants - Replace with your actual contract address
-        const CONTRACT_ADDRESS = '0x1339ab6B2C02f826327CCECC7D2384F628d2B230';
-        // Target network information
-        const TARGET_NETWORK = {
-            chainId: 11155111,  // Sepolia testnet
-            name: 'Sepolia Testnet'
-        };
-        
+        // Contract details - REMEMBER TO REPLACE WITH YOUR CONTRACT ADDRESS
+        const CONTRACT_ADDRESS = 'YOUR_CONTRACT_ADDRESS_HERE';
         const CONTRACT_ABI = [
             {
                 "inputs": [
@@ -335,31 +524,11 @@
             }
         ];
 
-        // Network Explorer URLs for transaction links
-        const NETWORK_EXPLORERS = {
-            1: 'https://etherscan.io/tx/',          // Ethereum Mainnet
-            5: 'https://goerli.etherscan.io/tx/',   // Goerli Testnet
-            11155111: 'https://sepolia.etherscan.io/tx/', // Sepolia Testnet
-            80001: 'https://mumbai.polygonscan.com/tx/', // Mumbai Testnet
-            137: 'https://polygonscan.com/tx/',     // Polygon Mainnet
-            42161: 'https://arbiscan.io/tx/',       // Arbitrum
-            10: 'https://optimistic.etherscan.io/tx/', // Optimism
-            56: 'https://bscscan.com/tx/',          // Binance Smart Chain
-            43114: 'https://snowtrace.io/tx/',      // Avalanche
-            421613: 'https://goerli.arbiscan.io/tx/' // Arbitrum Goerli
-        };
-
-        // App Variables
+        // App variables
         let provider, signer, contract;
-        let connectedAddress = null;
-        let currentChainId = null;
-        let debugMode = false;
-        let isCorrectNetwork = false;
+        let userAddress = null;
         
-        // Keep track of the last transaction hash to avoid duplicate notifications
-        let lastPickWinnerTxHash = '';
-        
-        // DOM Elements
+        // DOM elements
         const connectWalletBtn = document.getElementById('connect-wallet');
         const enterLotteryBtn = document.getElementById('enter-lottery');
         const pickWinnerBtn = document.getElementById('pick-winner');
@@ -367,325 +536,100 @@
         const playersList = document.getElementById('players-list');
         const adminSection = document.getElementById('admin-section');
         const prizePool = document.getElementById('prize-pool');
-        const participantCount = document.getElementById('participant-count');
+        const playerCount = document.getElementById('player-count');
         const statusMessage = document.getElementById('status-message');
-        const networkName = document.getElementById('network-name');
-        const debugBox = document.getElementById('debug-box');
-        const toggleDebugBtn = document.getElementById('toggle-debug');
-        const transactionInfo = document.getElementById('transaction-info');
-        const networkWarning = document.getElementById('network-warning');
         
-        // Helper function to log debug information
-        function logDebug(message, data = null) {
-            const timestamp = new Date().toLocaleTimeString();
-            let logMessage = `[${timestamp}] ${message}`;
-            
-            if (data) {
-                console.log(message, data);
-                try {
-                    if (typeof data === 'object') {
-                        logMessage += `: ${JSON.stringify(data, null, 2)}`;
-                    } else {
-                        logMessage += `: ${data}`;
-                    }
-                } catch (error) {
-                    logMessage += `: [Object cannot be stringified]`;
-                }
-            } else {
-                console.log(message);
-            }
-            
-            debugBox.innerHTML += `<div>${logMessage}</div>`;
-            debugBox.scrollTop = debugBox.scrollHeight;
-        }
-        
-        // Get network name from chain ID
-        function getNetworkName(chainId) {
-            const networks = {
-                1: 'Ethereum Mainnet',
-                5: 'Goerli Testnet',
-                11155111: 'Sepolia Testnet',
-                80001: 'Mumbai Testnet',
-                137: 'Polygon Mainnet',
-                42161: 'Arbitrum One',
-                10: 'Optimism',
-                56: 'Binance Smart Chain',
-                43114: 'Avalanche',
-                421613: 'Arbitrum Goerli'
-            };
-            
-            return networks[chainId] || `Chain ID: ${chainId}`;
-        }
-        
-        // Get explorer URL for a transaction
-        function getExplorerUrl(chainId, txHash) {
-            const baseUrl = NETWORK_EXPLORERS[chainId] || 'https://etherscan.io/tx/';
-            return baseUrl + txHash;
-        }
-        
-        // Display transaction link
-        function displayTransactionLink(txHash, message) {
-            if (!txHash) return;
-            
-            const explorerUrl = getExplorerUrl(currentChainId, txHash);
-            transactionInfo.innerHTML = `
-                <div class="status success" style="margin-bottom: 10px;">
-                    ${message} 
-                    <a href="${explorerUrl}" class="transaction-link" target="_blank">
-                        View on Explorer
-                    </a>
-                </div>
-            `;
-        }
-        
-        // Check if we're on the correct network
-        function checkNetwork(chainId) {
-            if (chainId !== TARGET_NETWORK.chainId) {
-                networkWarning.style.display = 'block';
-                isCorrectNetwork = false;
-                return false;
-            } else {
-                networkWarning.style.display = 'none';
-                isCorrectNetwork = true;
-                return true;
-            }
-        }
-        
-        // Request network switch
-        async function switchNetwork() {
-            if (!window.ethereum) return false;
-            
-            try {
-                logDebug('Requesting network switch to', TARGET_NETWORK.chainId);
-                
-                // Try to switch to the Sepolia network
-                await window.ethereum.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0x' + TARGET_NETWORK.chainId.toString(16) }],
-                });
-                
-                return true;
-            } catch (switchError) {
-                // This error code indicates that the chain has not been added to MetaMask.
-                if (switchError.code === 4902) {
-                    try {
-                        await window.ethereum.request({
-                            method: 'wallet_addEthereumChain',
-                            params: [
-                                {
-                                    chainId: '0x' + TARGET_NETWORK.chainId.toString(16),
-                                    chainName: TARGET_NETWORK.name,
-                                    nativeCurrency: {
-                                        name: 'ETH',
-                                        symbol: 'ETH',
-                                        decimals: 18
-                                    },
-                                    rpcUrls: ['https://rpc.sepolia.org'],
-                                    blockExplorerUrls: ['https://sepolia.etherscan.io/']
-                                }
-                            ],
-                        });
-                        return true;
-                    } catch (addError) {
-                        logDebug('Error adding Sepolia network', addError.message);
-                        return false;
-                    }
-                } else {
-                    logDebug('Error switching network', switchError.message);
-                    return false;
-                }
-            }
-        }
-        
-        // Connect to MetaMask and setup contract
+        // Connect to MetaMask
         async function connectWallet() {
             try {
-                logDebug('Attempting to connect wallet...');
-                
                 if (window.ethereum) {
-                    // Create provider without ENS support to avoid the error
+                    // Create provider without ENS to avoid errors on Sepolia
                     provider = new ethers.providers.Web3Provider(window.ethereum, {
                         name: 'sepolia',
-                        chainId: TARGET_NETWORK.chainId,
-                        ensAddress: null // Disable ENS lookups
+                        chainId: 11155111,
+                        ensAddress: null 
                     });
                     
                     // Request account access
                     const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-                    connectedAddress = accounts[0];
-                    logDebug('Connected address', connectedAddress);
-                    
-                    // Get current chain ID
-                    const { chainId } = await provider.getNetwork();
-                    currentChainId = chainId;
-                    logDebug('Connected to network', getNetworkName(chainId));
-                    
-                    // Check if we're on the correct network
-                    if (!checkNetwork(chainId)) {
-                        showStatus(`Wrong network detected. Please switch to ${TARGET_NETWORK.name}.`, 'error');
-                        const switched = await switchNetwork();
-                        if (!switched) {
-                            return false;
-                        }
-                        
-                        // Refresh provider after network switch
-                        provider = new ethers.providers.Web3Provider(window.ethereum, {
-                            name: 'sepolia',
-                            chainId: TARGET_NETWORK.chainId,
-                            ensAddress: null
-                        });
-                        
-                        // Get updated chain ID
-                        const { chainId: newChainId } = await provider.getNetwork();
-                        currentChainId = newChainId;
-                        logDebug('Now connected to network', getNetworkName(newChainId));
-                    }
-                    
-                    // Update network display
-                    networkName.textContent = getNetworkName(currentChainId);
+                    userAddress = accounts[0];
                     
                     signer = provider.getSigner();
                     contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
                     
-                    // Update UI based on connection
+                    // Update UI
                     connectionStatus.className = 'status success';
                     connectionStatus.textContent = 'Connected: ' + 
-                        connectedAddress.substring(0, 6) + '...' + 
-                        connectedAddress.substring(38);
-                    
-                    // Only enable enter button if on correct network
-                    enterLotteryBtn.disabled = !isCorrectNetwork;
+                        userAddress.substring(0, 6) + '...' + 
+                        userAddress.substring(38);
+                    enterLotteryBtn.disabled = false;
                     connectWalletBtn.disabled = true;
                     
-                    // Verify contract exists on this network
-                    try {
-                        const code = await provider.getCode(CONTRACT_ADDRESS);
-                        if (code === '0x') {
-                            showStatus(`Contract not found on ${getNetworkName(currentChainId)}. Please check your network.`, 'error');
-                            logDebug('Contract bytecode not found at address', CONTRACT_ADDRESS);
-                            return false;
-                        }
-                        logDebug('Contract verified at address', CONTRACT_ADDRESS);
-                    } catch (error) {
-                        showStatus(`Failed to verify contract: ${error.message}`, 'error');
-                        logDebug('Contract verification error', error.message);
-                        return false;
+                    // Check if user is owner
+                    const owner = await contract.owner();
+                    if (owner.toLowerCase() === userAddress.toLowerCase()) {
+                        adminSection.style.display = 'block';
                     }
                     
-                    // Check if user is contract owner
-                    try {
-                        const owner = await contract.owner();
-                        logDebug('Contract owner', owner);
-                        
-                        if (owner.toLowerCase() === connectedAddress.toLowerCase()) {
-                            adminSection.style.display = 'block';
-                            logDebug('User is the contract owner, admin controls enabled');
-                        } else {
-                            logDebug('User is not the contract owner');
-                            adminSection.style.display = 'none';
-                        }
-                    } catch (error) {
-                        logDebug('Error checking owner:', error.message);
-                    }
-                    
-                    // Setup event listeners for network changes
-                    window.ethereum.on('chainChanged', (chainId) => {
-                        logDebug('Network changed, reloading...', parseInt(chainId, 16));
+                    // Listen for account/network changes
+                    window.ethereum.on('accountsChanged', function () {
                         window.location.reload();
                     });
                     
-                    window.ethereum.on('accountsChanged', (accounts) => {
-                        logDebug('Account changed, reloading...', accounts[0]);
+                    window.ethereum.on('chainChanged', function () {
                         window.location.reload();
                     });
                     
-                    // Load initial lottery data
-                    await refreshLotteryData();
-                    
-                    // Setup event listeners for contract events
+                    // Update lottery data & setup events
+                    await updateLotteryInfo();
                     setupEventListeners();
                     
                     return true;
                 } else {
-                    showStatus('No Ethereum wallet found. Please install MetaMask.', 'error');
-                    logDebug('No Ethereum wallet found');
+                    showStatus('Please install MetaMask to use this app!', 'error');
                     return false;
                 }
             } catch (error) {
                 console.error(error);
-                showStatus('Failed to connect wallet: ' + error.message, 'error');
-                logDebug('Connection error', error.message);
+                showStatus('Failed to connect: ' + error.message, 'error');
                 return false;
             }
         }
         
-        // Check if contract is deployed on current network
-        async function isContractDeployed() {
+        // Update lottery information
+        async function updateLotteryInfo() {
             try {
-                const code = await provider.getCode(CONTRACT_ADDRESS);
-                return code !== '0x';
-            } catch (error) {
-                logDebug('Error checking if contract is deployed', error.message);
-                return false;
-            }
-        }
-        
-        // Check contract balance
-        async function checkContractBalance() {
-            try {
-                const balance = await provider.getBalance(CONTRACT_ADDRESS);
-                logDebug('Contract balance', ethers.utils.formatEther(balance) + ' ETH');
-                return balance;
-            } catch (error) {
-                logDebug('Error checking contract balance', error.message);
-                return ethers.BigNumber.from(0);
-            }
-        }
-        
-        // Refresh lottery data
-        async function refreshLotteryData() {
-            try {
-                logDebug('Refreshing lottery data...');
-                
-                // Check if contract is deployed on this network
-                const deployed = await isContractDeployed();
-                if (!deployed) {
-                    showStatus(`Contract not deployed on ${getNetworkName(currentChainId)}. Please switch networks.`, 'error');
-                    logDebug('Contract not deployed on current network');
+                // Check if contract exists on this network
+                try {
+                    const code = await provider.getCode(CONTRACT_ADDRESS);
+                    if (code === '0x') {
+                        showStatus('Contract not found on this network. Please switch to Sepolia testnet.', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    showStatus('Error connecting to contract. Please check your network.', 'error');
                     return;
                 }
                 
                 // Get current players
-                try {
-                    const players = await contract.getPlayers();
-                    logDebug('Current players', players);
-                    updatePlayersList(players);
-                    
-                    // Update participant count
-                    participantCount.textContent = players.length;
-                } catch (error) {
-                    logDebug('Error getting players:', error.message);
-                }
+                const players = await contract.getPlayers();
+                updatePlayersList(players);
                 
-                // Get current balance
-                try {
-                    const balance = await provider.getBalance(CONTRACT_ADDRESS);
-                    prizePool.textContent = ethers.utils.formatEther(balance) + ' ETH';
-                } catch (error) {
-                    logDebug('Error getting balance:', error.message);
-                }
+                // Get current balance (prize pool)
+                const balance = await provider.getBalance(CONTRACT_ADDRESS);
+                prizePool.textContent = ethers.utils.formatEther(balance) + ' ETH';
                 
-                logDebug('Lottery data refreshed successfully');
+                // Update player count
+                playerCount.textContent = players.length;
             } catch (error) {
-                console.error('Error refreshing lottery data:', error);
-                logDebug('Error refreshing lottery data', error.message);
+                console.error('Error updating lottery info:', error);
             }
         }
         
-        // Update the players list
+        // Update the players list display
         function updatePlayersList(players) {
             if (players.length === 0) {
-                playersList.innerHTML = '<p>No participants yet.</p>';
+                playersList.innerHTML = '<p>No players yet. Be the first to enter!</p>';
                 return;
             }
             
@@ -694,9 +638,9 @@
                 const playerElement = document.createElement('div');
                 playerElement.className = 'player-item';
                 
-                // Highlight the current user
-                if (player.toLowerCase() === connectedAddress?.toLowerCase()) {
-                    playerElement.style.backgroundColor = '#e6f7ff';
+                // Highlight if current user
+                if (player.toLowerCase() === userAddress?.toLowerCase()) {
+                    playerElement.className += ' your-entry';
                     playerElement.textContent = `${player} (You)`;
                 } else {
                     playerElement.textContent = player;
@@ -711,389 +655,132 @@
             try {
                 enterLotteryBtn.disabled = true;
                 showStatus('Entering lottery...', 'warning');
-                logDebug('Attempting to enter lottery...');
                 
-                // Verify network is correct
-                if (!isCorrectNetwork) {
-                    showStatus(`Wrong network. Please switch to ${TARGET_NETWORK.name}.`, 'error');
-                    logDebug('Attempting to enter on wrong network');
-                    enterLotteryBtn.disabled = false;
-                    return;
-                }
-                
-                // Check if user already in the lottery
+                // Check if already entered
                 const players = await contract.getPlayers();
                 const alreadyEntered = players.some(
-                    player => player.toLowerCase() === connectedAddress.toLowerCase()
+                    player => player.toLowerCase() === userAddress.toLowerCase()
                 );
                 
                 if (alreadyEntered) {
                     showStatus('You are already in this lottery!', 'warning');
-                    logDebug('User already in lottery');
-                    enterLotteryBtn.disabled = false;
-                    return;
-                }
-                
-                // Get user's ETH balance
-                const balance = await provider.getBalance(connectedAddress);
-                const entryFee = ethers.utils.parseEther('0.001');
-                
-                if (balance.lt(entryFee)) {
-                    showStatus('Insufficient ETH balance to enter the lottery', 'error');
-                    logDebug('Insufficient balance', ethers.utils.formatEther(balance) + ' ETH');
                     enterLotteryBtn.disabled = false;
                     return;
                 }
                 
                 // Send transaction
-                let tx;
-                try {
-                    // Estimate gas for the transaction
-                    const gasEstimate = await contract.estimateGas.enter({
-                        value: ethers.utils.parseEther('0.001')
-                    });
-                    
-                    logDebug('Gas estimate for enter()', gasEstimate.toString());
-                    
-                    // Send transaction with a 20% buffer on gas
-                    tx = await contract.enter({
-                        value: ethers.utils.parseEther('0.001'),
-                        gasLimit: gasEstimate.mul(120).div(100)
-                    });
-                } catch (error) {
-                    showStatus('Error sending transaction: ' + error.message, 'error');
-                    logDebug('Transaction error', error.message);
-                    enterLotteryBtn.disabled = false;
-                    return;
-                }
+                const tx = await contract.enter({
+                    value: ethers.utils.parseEther('0.001')
+                });
                 
-                logDebug('Transaction submitted', tx.hash);
-                showStatus('Transaction submitted. Waiting for confirmation...', 'warning');
-                displayTransactionLink(tx.hash, 'Transaction submitted:');
+                showStatus('Transaction sent! Waiting for confirmation...', 'warning');
                 
                 // Wait for confirmation
-                try {
-                    const receipt = await tx.wait();
-                    logDebug('Transaction confirmed', receipt);
-                    
-                    if (receipt.status === 1) {
-                        showStatus('Successfully entered the lottery!', 'success');
-                        displayTransactionLink(tx.hash, 'Successfully entered the lottery:');
-                    } else {
-                        showStatus('Transaction failed. Please try again.', 'error');
-                        logDebug('Transaction failed', receipt);
-                    }
-                } catch (error) {
-                    showStatus('Error waiting for confirmation: ' + error.message, 'error');
-                    logDebug('Confirmation error', error.message);
+                const receipt = await tx.wait();
+                
+                if (receipt.status === 1) {
+                    showStatus('You have entered the lottery! Good luck! 🍀', 'success');
+                } else {
+                    showStatus('Transaction failed. Please try again.', 'error');
                 }
                 
-                await refreshLotteryData();
+                await updateLotteryInfo();
             } catch (error) {
                 console.error('Error entering lottery:', error);
-                showStatus('Failed to enter lottery: ' + error.message, 'error');
-                logDebug('Error entering lottery', error.message);
+                showStatus('Failed to enter: ' + error.message, 'error');
             } finally {
                 enterLotteryBtn.disabled = false;
             }
         }
         
-        // Check winner's balance before and after to verify transfer
-        async function checkWinnerBalanceChange(winner, beforeBlockNumber, afterBlockNumber) {
-            try {
-                const beforeBalance = await provider.getBalance(winner, beforeBlockNumber);
-                const afterBalance = await provider.getBalance(winner, afterBlockNumber);
-                const difference = afterBalance.sub(beforeBalance);
-                
-                logDebug('Winner balance before', ethers.utils.formatEther(beforeBalance) + ' ETH');
-                logDebug('Winner balance after', ethers.utils.formatEther(afterBalance) + ' ETH');
-                logDebug('Balance difference', ethers.utils.formatEther(difference) + ' ETH');
-                
-                return difference;
-            } catch (error) {
-                logDebug('Error checking winner balance change', error.message);
-                return ethers.BigNumber.from(0);
-            }
-        }
-        
-        // Pick winner (admin only)
+        // Pick a winner (admin only)
         async function pickWinner() {
             try {
                 pickWinnerBtn.disabled = true;
                 showStatus('Picking a winner...', 'warning');
-                logDebug('Attempting to pick a winner...');
                 
-                // Verify network is correct
-                if (!isCorrectNetwork) {
-                    showStatus(`Wrong network. Please switch to ${TARGET_NETWORK.name}.`, 'error');
-                    logDebug('Attempting to pick winner on wrong network');
-                    pickWinnerBtn.disabled = false;
-                    return;
-                }
-                
-                // Check contract balance before proceeding
-                const balance = await checkContractBalance();
-                if (balance.eq(0)) {
-                    showStatus('Contract has no ETH to distribute!', 'error');
-                    logDebug('Contract has no balance to distribute');
-                    pickWinnerBtn.disabled = false;
-                    return;
-                }
-                
-                logDebug('Contract funds before transfer', ethers.utils.formatEther(balance) + ' ETH');
-                
-                // Check if there are any players
+                // Check if there are players
                 const players = await contract.getPlayers();
                 if (players.length === 0) {
-                    showStatus('No participants in the lottery!', 'error');
-                    logDebug('No participants in lottery');
-                    pickWinnerBtn.disabled = false;
-                    return;
-                }
-                
-                // Get owner balance to make sure they can pay gas
-                const ownerBalance = await provider.getBalance(connectedAddress);
-                if (ownerBalance.lt(ethers.utils.parseEther('0.001'))) {
-                    showStatus('You need at least 0.001 ETH to pay for transaction gas', 'error');
-                    logDebug('Owner has insufficient ETH for gas', ethers.utils.formatEther(ownerBalance) + ' ETH');
+                    showStatus('No players in the lottery!', 'error');
                     pickWinnerBtn.disabled = false;
                     return;
                 }
                 
                 // Send transaction
-                let tx;
-                try {
-                    // Estimate gas for the transaction
-                    const gasEstimate = await contract.estimateGas.pickWinner();
-                    logDebug('Gas estimate for pickWinner()', gasEstimate.toString());
-                    
-                    // Send transaction with a 50% buffer on gas (increased from 30%)
-                    tx = await contract.pickWinner({
-                        gasLimit: gasEstimate.mul(150).div(100)
-                    });
-                    
-                    // Store transaction hash to avoid duplicate notifications
-                    lastPickWinnerTxHash = tx.hash;
-                } catch (error) {
-                    showStatus('Error sending transaction: ' + error.message, 'error');
-                    logDebug('Transaction error', error.message);
-                    pickWinnerBtn.disabled = false;
-                    return;
-                }
+                const tx = await contract.pickWinner();
                 
-                logDebug('Transaction submitted', tx.hash);
-                showStatus('Transaction submitted. Waiting for confirmation...', 'warning');
-                displayTransactionLink(tx.hash, 'Transaction submitted:');
+                showStatus('Transaction sent! Waiting for confirmation...', 'warning');
                 
                 // Wait for confirmation
-                try {
-                    // Store block number before transaction for balance comparison
-                    const currentBlock = await provider.getBlockNumber();
-                    
-                    const receipt = await tx.wait();
-                    logDebug('Transaction receipt', receipt);
-                    logDebug('Full transaction receipt JSON', JSON.stringify(receipt, null, 2));
-                    
-                    // Check if the transaction was successful
-                    if (receipt.status === 1) {
-                        // Look for the WinnerPicked event in the logs
-                        let winnerFound = false;
-                        let winner = null;
-                        let prize = null;
-                        
-                        for (const log of receipt.logs) {
-                            try {
-                                // Try to parse the log using the contract interface
-                                const parsedLog = contract.interface.parseLog(log);
-                                
-                                if (parsedLog.name === 'WinnerPicked') {
-                                    winner = parsedLog.args.winner;
-                                    prize = ethers.utils.formatEther(parsedLog.args.prize);
-                                    
-                                    logDebug('Winner picked', { winner, prize: prize + ' ETH' });
-                                    
-                                    if (winner.toLowerCase() === connectedAddress.toLowerCase()) {
-                                        showStatus(`Congratulations! You won ${prize} ETH! 🎉`, 'success');
-                                    } else {
-                                        showStatus(`Winner picked: ${winner.substring(0, 6)}...${winner.substring(38)} won ${prize} ETH!`, 'success');
-                                    }
-                                    
-                                    displayTransactionLink(tx.hash, 'Winner successfully picked:');
-                                    
-                                    // Check winner's balance change
-                                    const balanceChange = await checkWinnerBalanceChange(
-                                        winner, 
-                                        currentBlock, 
-                                        receipt.blockNumber
-                                    );
-                                    
-                                    // If balance change is too small, show warning
-                                    if (balanceChange.lt(ethers.utils.parseEther('0.0001'))) {
-                                        showStatus('Warning: Winner\'s balance did not increase significantly!', 'warning');
-                                        logDebug('Winner balance did not increase significantly', 
-                                            ethers.utils.formatEther(balanceChange) + ' ETH');
-                                    }
-                                    
-                                    winnerFound = true;
-                                    break;
-                                }
-                            } catch (error) {
-                                // Failed to parse this log, try the next one
-                                continue;
-                            }
-                        }
-                        
-                        if (!winnerFound) {
-                            showStatus('Transaction successful, but winner event not found. Check transaction on explorer.', 'warning');
-                            logDebug('Winner event not found in logs');
-                        }
-                        
-                        // Check contract balance after the transaction to verify funds were sent
-                        const afterBalance = await checkContractBalance();
-                        logDebug('Contract funds after transfer', ethers.utils.formatEther(afterBalance) + ' ETH');
-                        
-                        if (afterBalance.gt(0)) {
-                            showStatus('Warning: Contract still has balance after picking winner!', 'warning');
-                            logDebug('Contract still has balance', ethers.utils.formatEther(afterBalance) + ' ETH');
-                        } else {
-                            logDebug('Contract balance is now zero, funds were transferred');
-                        }
-                    } else {
-                        showStatus('Transaction failed. The winner was not picked.', 'error');
-                        logDebug('Transaction failed', receipt);
-                    }
-                } catch (error) {
-                    showStatus('Error waiting for confirmation: ' + error.message, 'error');
-                    logDebug('Confirmation error', error.message);
+                const receipt = await tx.wait();
+                
+                if (receipt.status === 1) {
+                    showStatus('Winner has been picked! Check your wallet for winnings. 🎉', 'success');
+                } else {
+                    showStatus('Transaction failed. Please try again.', 'error');
                 }
                 
-                await refreshLotteryData();
+                await updateLotteryInfo();
             } catch (error) {
                 console.error('Error picking winner:', error);
                 showStatus('Failed to pick winner: ' + error.message, 'error');
-                logDebug('Error picking winner', error.message);
             } finally {
                 pickWinnerBtn.disabled = false;
             }
         }
         
-        // Display status messages
+        // Show status messages
         function showStatus(message, type) {
             statusMessage.innerHTML = `<div class="status ${type}">${message}</div>`;
-            logDebug(`Status message (${type})`, message);
             
-            // Only clear success messages after 5 seconds (keep errors visible)
-            if (type === 'success') {
+            // Clear success/error messages after 5 seconds
+            if (type === 'success' || type === 'error') {
                 setTimeout(() => {
-                    // Only clear if it's still the same message
-                    if (statusMessage.querySelector('.status').textContent === message) {
-                        statusMessage.innerHTML = '';
-                    }
+                    statusMessage.innerHTML = '';
                 }, 5000);
             }
         }
         
         // Setup event listeners for contract events
         function setupEventListeners() {
-            logDebug('Setting up event listeners...');
+            // Listen for new players
+            contract.on("LotteryEntered", (player, amount) => {
+                updateLotteryInfo();
+                if (player.toLowerCase() !== userAddress.toLowerCase()) {
+                    showStatus(`New player entered the lottery!`, 'success');
+                }
+            });
             
-            try {
-                // Remove any existing listeners to prevent duplicates
-                contract.removeAllListeners();
+            // Listen for winner picked
+            contract.on("WinnerPicked", (winner, prize) => {
+                updateLotteryInfo();
+                const prizeEth = ethers.utils.formatEther(prize);
                 
-                contract.on("LotteryEntered", (player, amount, event) => {
-                    logDebug('LotteryEntered event', { 
-                        player, 
-                        amount: ethers.utils.formatEther(amount) + ' ETH',
-                        transactionHash: event.transactionHash
-                    });
-                    
-                    refreshLotteryData();
-                    
-                    if (player.toLowerCase() !== connectedAddress.toLowerCase()) {
-                        showStatus(`New participant: ${player.substring(0, 6)}...${player.substring(38)}`, 'success');
-                    }
-                });
-                
-                contract.on("WinnerPicked", (winner, prize, event) => {
-                    logDebug('WinnerPicked event', { 
-                        winner, 
-                        prize: ethers.utils.formatEther(prize) + ' ETH',
-                        transactionHash: event.transactionHash
-                    });
-                    
-                    refreshLotteryData();
-                    
-                    // Only display notification if the user didn't trigger this event themselves
-                    if (event.transactionHash !== lastPickWinnerTxHash) {
-                        if (winner.toLowerCase() === connectedAddress.toLowerCase()) {
-                            showStatus(`Congratulations! You won ${ethers.utils.formatEther(prize)} ETH! 🎉`, 'success');
-                        } else {
-                            showStatus(`Winner picked: ${winner.substring(0, 6)}...${winner.substring(38)} won ${ethers.utils.formatEther(prize)} ETH!`, 'warning');
-                        }
-                    }
-                });
-                
-                logDebug('Event listeners set up successfully');
-            } catch (error) {
-                logDebug('Error setting up event listeners', error.message);
-            }
+                if (winner.toLowerCase() === userAddress.toLowerCase()) {
+                    showStatus(`Congratulations! You won ${prizeEth} ETH! 🎉`, 'success');
+                } else {
+                    showStatus(`Winner has been picked and won ${prizeEth} ETH!`, 'warning');
+                }
+            });
         }
         
-        // Toggle debug information display
-        toggleDebugBtn.addEventListener('click', () => {
-            debugMode = !debugMode;
-            debugBox.style.display = debugMode ? 'block' : 'none';
-            toggleDebugBtn.textContent = debugMode ? 'Hide Debug Info' : 'Show Debug Info';
-        });
-        
-        // Setup UI event listeners
+        // Button click event listeners
         connectWalletBtn.addEventListener('click', connectWallet);
-        
         enterLotteryBtn.addEventListener('click', enterLottery);
+        pickWinnerBtn.addEventListener('click', pickWinner);
         
-        pickWinnerBtn.addEventListener('click', async () => {
-            try {
-                // Call pickWinner directly - the function handles the transaction
-                await pickWinner();
-            } catch (error) {
-                console.error('Error in pickWinner click handler:', error);
-                logDebug('Error in pickWinner click handler', error.message);
-            }
-        });
-        
-        // Network warning click handler - attempt to switch networks
-        networkWarning.addEventListener('click', async () => {
-            await switchNetwork();
-        });
-        
-        // Check if MetaMask is already connected
+        // Check if MetaMask is already connected on page load
         window.addEventListener('load', async () => {
-            logDebug('Application started');
-            
-            // Check if ethers is loaded
-            if (typeof ethers === 'undefined') {
-                connectionStatus.className = 'status error';
-                connectionStatus.textContent = 'Error: ethers.js library failed to load. Please try refreshing the page.';
-                logDebug('ethers.js library not loaded');
-                return;
-            }
-            
             if (window.ethereum) {
                 try {
-                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                    const accounts = await ethereum.request({ method: 'eth_accounts' });
                     if (accounts.length > 0) {
-                        logDebug('Found connected account', accounts[0]);
                         await connectWallet();
                     }
                 } catch (error) {
                     console.error(error);
-                    logDebug('Error checking for connected accounts', error.message);
                 }
-            } else {
-                logDebug('No Ethereum provider detected');
-                connectionStatus.className = 'status error';
-                connectionStatus.textContent = 'No Ethereum wallet found. Please install MetaMask.';
             }
         });
     </script>

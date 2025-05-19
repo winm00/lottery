@@ -6,7 +6,6 @@
     <title>Decentralized Lottery</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <style>
-        /* CSS remains the same as before */
         body {
             font-family: 'Arial', sans-serif;
             line-height: 1.6;
@@ -117,6 +116,8 @@
             font-family: monospace;
             font-size: 14px;
             display: none;
+            max-height: 300px;
+            overflow-y: auto;
         }
         .transaction-link {
             color: #6c5ce7;
@@ -125,6 +126,16 @@
         }
         .transaction-link:hover {
             text-decoration: underline;
+        }
+        .network-warning {
+            background-color: #ff8a80;
+            color: #fff;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
         }
         @media (max-width: 600px) {
             .lottery-stats {
@@ -139,6 +150,10 @@
         
         <div class="info-box">
             <p><strong>How it works:</strong> Enter the lottery by paying 0.001 ETH. When the lottery owner picks a winner, one random participant will receive the entire prize pool!</p>
+        </div>
+        
+        <div id="network-warning" class="network-warning">
+            You are on the wrong network. Please switch to Sepolia Testnet.
         </div>
         
         <div id="connection-status" class="status warning">
@@ -190,6 +205,12 @@
     <script>
         // Contract Constants - Replace with your actual contract address
         const CONTRACT_ADDRESS = '0xe06c028472fe420A9a7f7a093f82B840038943E7';
+        // Target network information
+        const TARGET_NETWORK = {
+            chainId: 11155111,  // Sepolia testnet
+            name: 'Sepolia Testnet'
+        };
+        
         const CONTRACT_ABI = [
             {
                 "inputs": [
@@ -333,6 +354,10 @@
         let connectedAddress = null;
         let currentChainId = null;
         let debugMode = false;
+        let isCorrectNetwork = false;
+        
+        // Keep track of the last transaction hash to avoid duplicate notifications
+        let lastPickWinnerTxHash = '';
         
         // DOM Elements
         const connectWalletBtn = document.getElementById('connect-wallet');
@@ -348,6 +373,7 @@
         const debugBox = document.getElementById('debug-box');
         const toggleDebugBtn = document.getElementById('toggle-debug');
         const transactionInfo = document.getElementById('transaction-info');
+        const networkWarning = document.getElementById('network-warning');
         
         // Helper function to log debug information
         function logDebug(message, data = null) {
@@ -412,6 +438,65 @@
             `;
         }
         
+        // Check if we're on the correct network
+        function checkNetwork(chainId) {
+            if (chainId !== TARGET_NETWORK.chainId) {
+                networkWarning.style.display = 'block';
+                isCorrectNetwork = false;
+                return false;
+            } else {
+                networkWarning.style.display = 'none';
+                isCorrectNetwork = true;
+                return true;
+            }
+        }
+        
+        // Request network switch
+        async function switchNetwork() {
+            if (!window.ethereum) return false;
+            
+            try {
+                logDebug('Requesting network switch to', TARGET_NETWORK.chainId);
+                
+                // Try to switch to the Sepolia network
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x' + TARGET_NETWORK.chainId.toString(16) }],
+                });
+                
+                return true;
+            } catch (switchError) {
+                // This error code indicates that the chain has not been added to MetaMask.
+                if (switchError.code === 4902) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [
+                                {
+                                    chainId: '0x' + TARGET_NETWORK.chainId.toString(16),
+                                    chainName: TARGET_NETWORK.name,
+                                    nativeCurrency: {
+                                        name: 'ETH',
+                                        symbol: 'ETH',
+                                        decimals: 18
+                                    },
+                                    rpcUrls: ['https://rpc.sepolia.org'],
+                                    blockExplorerUrls: ['https://sepolia.etherscan.io/']
+                                }
+                            ],
+                        });
+                        return true;
+                    } catch (addError) {
+                        logDebug('Error adding Sepolia network', addError.message);
+                        return false;
+                    }
+                } else {
+                    logDebug('Error switching network', switchError.message);
+                    return false;
+                }
+            }
+        }
+        
         // Connect to MetaMask and setup contract
         async function connectWallet() {
             try {
@@ -421,7 +506,7 @@
                     // Create provider without ENS support to avoid the error
                     provider = new ethers.providers.Web3Provider(window.ethereum, {
                         name: 'sepolia',
-                        chainId: 11155111,
+                        chainId: TARGET_NETWORK.chainId,
                         ensAddress: null // Disable ENS lookups
                     });
                     
@@ -435,8 +520,29 @@
                     currentChainId = chainId;
                     logDebug('Connected to network', getNetworkName(chainId));
                     
+                    // Check if we're on the correct network
+                    if (!checkNetwork(chainId)) {
+                        showStatus(`Wrong network detected. Please switch to ${TARGET_NETWORK.name}.`, 'error');
+                        const switched = await switchNetwork();
+                        if (!switched) {
+                            return false;
+                        }
+                        
+                        // Refresh provider after network switch
+                        provider = new ethers.providers.Web3Provider(window.ethereum, {
+                            name: 'sepolia',
+                            chainId: TARGET_NETWORK.chainId,
+                            ensAddress: null
+                        });
+                        
+                        // Get updated chain ID
+                        const { chainId: newChainId } = await provider.getNetwork();
+                        currentChainId = newChainId;
+                        logDebug('Now connected to network', getNetworkName(newChainId));
+                    }
+                    
                     // Update network display
-                    networkName.textContent = getNetworkName(chainId);
+                    networkName.textContent = getNetworkName(currentChainId);
                     
                     signer = provider.getSigner();
                     contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
@@ -446,8 +552,25 @@
                     connectionStatus.textContent = 'Connected: ' + 
                         connectedAddress.substring(0, 6) + '...' + 
                         connectedAddress.substring(38);
-                    enterLotteryBtn.disabled = false;
+                    
+                    // Only enable enter button if on correct network
+                    enterLotteryBtn.disabled = !isCorrectNetwork;
                     connectWalletBtn.disabled = true;
+                    
+                    // Verify contract exists on this network
+                    try {
+                        const code = await provider.getCode(CONTRACT_ADDRESS);
+                        if (code === '0x') {
+                            showStatus(`Contract not found on ${getNetworkName(currentChainId)}. Please check your network.`, 'error');
+                            logDebug('Contract bytecode not found at address', CONTRACT_ADDRESS);
+                            return false;
+                        }
+                        logDebug('Contract verified at address', CONTRACT_ADDRESS);
+                    } catch (error) {
+                        showStatus(`Failed to verify contract: ${error.message}`, 'error');
+                        logDebug('Contract verification error', error.message);
+                        return false;
+                    }
                     
                     // Check if user is contract owner
                     try {
@@ -459,6 +582,7 @@
                             logDebug('User is the contract owner, admin controls enabled');
                         } else {
                             logDebug('User is not the contract owner');
+                            adminSection.style.display = 'none';
                         }
                     } catch (error) {
                         logDebug('Error checking owner:', error.message);
@@ -589,6 +713,14 @@
                 showStatus('Entering lottery...', 'warning');
                 logDebug('Attempting to enter lottery...');
                 
+                // Verify network is correct
+                if (!isCorrectNetwork) {
+                    showStatus(`Wrong network. Please switch to ${TARGET_NETWORK.name}.`, 'error');
+                    logDebug('Attempting to enter on wrong network');
+                    enterLotteryBtn.disabled = false;
+                    return;
+                }
+                
                 // Check if user already in the lottery
                 const players = await contract.getPlayers();
                 const alreadyEntered = players.some(
@@ -666,12 +798,38 @@
             }
         }
         
+        // Check winner's balance before and after to verify transfer
+        async function checkWinnerBalanceChange(winner, beforeBlockNumber, afterBlockNumber) {
+            try {
+                const beforeBalance = await provider.getBalance(winner, beforeBlockNumber);
+                const afterBalance = await provider.getBalance(winner, afterBlockNumber);
+                const difference = afterBalance.sub(beforeBalance);
+                
+                logDebug('Winner balance before', ethers.utils.formatEther(beforeBalance) + ' ETH');
+                logDebug('Winner balance after', ethers.utils.formatEther(afterBalance) + ' ETH');
+                logDebug('Balance difference', ethers.utils.formatEther(difference) + ' ETH');
+                
+                return difference;
+            } catch (error) {
+                logDebug('Error checking winner balance change', error.message);
+                return ethers.BigNumber.from(0);
+            }
+        }
+        
         // Pick winner (admin only)
         async function pickWinner() {
             try {
                 pickWinnerBtn.disabled = true;
                 showStatus('Picking a winner...', 'warning');
                 logDebug('Attempting to pick a winner...');
+                
+                // Verify network is correct
+                if (!isCorrectNetwork) {
+                    showStatus(`Wrong network. Please switch to ${TARGET_NETWORK.name}.`, 'error');
+                    logDebug('Attempting to pick winner on wrong network');
+                    pickWinnerBtn.disabled = false;
+                    return;
+                }
                 
                 // Check contract balance before proceeding
                 const balance = await checkContractBalance();
@@ -681,6 +839,8 @@
                     pickWinnerBtn.disabled = false;
                     return;
                 }
+                
+                logDebug('Contract funds before transfer', ethers.utils.formatEther(balance) + ' ETH');
                 
                 // Check if there are any players
                 const players = await contract.getPlayers();
@@ -693,9 +853,9 @@
                 
                 // Get owner balance to make sure they can pay gas
                 const ownerBalance = await provider.getBalance(connectedAddress);
-                if (ownerBalance.eq(0)) {
-                    showStatus('You need some ETH to pay for transaction gas', 'error');
-                    logDebug('Owner has no ETH for gas', ethers.utils.formatEther(ownerBalance) + ' ETH');
+                if (ownerBalance.lt(ethers.utils.parseEther('0.001'))) {
+                    showStatus('You need at least 0.001 ETH to pay for transaction gas', 'error');
+                    logDebug('Owner has insufficient ETH for gas', ethers.utils.formatEther(ownerBalance) + ' ETH');
                     pickWinnerBtn.disabled = false;
                     return;
                 }
@@ -707,10 +867,13 @@
                     const gasEstimate = await contract.estimateGas.pickWinner();
                     logDebug('Gas estimate for pickWinner()', gasEstimate.toString());
                     
-                    // Send transaction with a 30% buffer on gas (increased from 20%)
+                    // Send transaction with a 50% buffer on gas (increased from 30%)
                     tx = await contract.pickWinner({
-                        gasLimit: gasEstimate.mul(130).div(100)
+                        gasLimit: gasEstimate.mul(150).div(100)
                     });
+                    
+                    // Store transaction hash to avoid duplicate notifications
+                    lastPickWinnerTxHash = tx.hash;
                 } catch (error) {
                     showStatus('Error sending transaction: ' + error.message, 'error');
                     logDebug('Transaction error', error.message);
@@ -724,13 +887,19 @@
                 
                 // Wait for confirmation
                 try {
+                    // Store block number before transaction for balance comparison
+                    const currentBlock = await provider.getBlockNumber();
+                    
                     const receipt = await tx.wait();
                     logDebug('Transaction receipt', receipt);
+                    logDebug('Full transaction receipt JSON', JSON.stringify(receipt, null, 2));
                     
                     // Check if the transaction was successful
                     if (receipt.status === 1) {
                         // Look for the WinnerPicked event in the logs
                         let winnerFound = false;
+                        let winner = null;
+                        let prize = null;
                         
                         for (const log of receipt.logs) {
                             try {
@@ -738,8 +907,8 @@
                                 const parsedLog = contract.interface.parseLog(log);
                                 
                                 if (parsedLog.name === 'WinnerPicked') {
-                                    const winner = parsedLog.args.winner;
-                                    const prize = ethers.utils.formatEther(parsedLog.args.prize);
+                                    winner = parsedLog.args.winner;
+                                    prize = ethers.utils.formatEther(parsedLog.args.prize);
                                     
                                     logDebug('Winner picked', { winner, prize: prize + ' ETH' });
                                     
@@ -750,6 +919,21 @@
                                     }
                                     
                                     displayTransactionLink(tx.hash, 'Winner successfully picked:');
+                                    
+                                    // Check winner's balance change
+                                    const balanceChange = await checkWinnerBalanceChange(
+                                        winner, 
+                                        currentBlock, 
+                                        receipt.blockNumber
+                                    );
+                                    
+                                    // If balance change is too small, show warning
+                                    if (balanceChange.lt(ethers.utils.parseEther('0.0001'))) {
+                                        showStatus('Warning: Winner\'s balance did not increase significantly!', 'warning');
+                                        logDebug('Winner balance did not increase significantly', 
+                                            ethers.utils.formatEther(balanceChange) + ' ETH');
+                                    }
+                                    
                                     winnerFound = true;
                                     break;
                                 }
@@ -766,6 +950,8 @@
                         
                         // Check contract balance after the transaction to verify funds were sent
                         const afterBalance = await checkContractBalance();
+                        logDebug('Contract funds after transfer', ethers.utils.formatEther(afterBalance) + ' ETH');
+                        
                         if (afterBalance.gt(0)) {
                             showStatus('Warning: Contract still has balance after picking winner!', 'warning');
                             logDebug('Contract still has balance', ethers.utils.formatEther(afterBalance) + ' ETH');
@@ -796,10 +982,13 @@
             statusMessage.innerHTML = `<div class="status ${type}">${message}</div>`;
             logDebug(`Status message (${type})`, message);
             
-            // Clear success/error messages after 5 seconds
-            if (type === 'success' || type === 'error') {
+            // Only clear success messages after 5 seconds (keep errors visible)
+            if (type === 'success') {
                 setTimeout(() => {
-                    statusMessage.innerHTML = '';
+                    // Only clear if it's still the same message
+                    if (statusMessage.querySelector('.status').textContent === message) {
+                        statusMessage.innerHTML = '';
+                    }
                 }, 5000);
             }
         }
@@ -858,9 +1047,6 @@
             toggleDebugBtn.textContent = debugMode ? 'Hide Debug Info' : 'Show Debug Info';
         });
         
-        // Keep track of the last transaction hash to avoid duplicate notifications
-        let lastPickWinnerTxHash = '';
-        
         // Setup UI event listeners
         connectWalletBtn.addEventListener('click', connectWallet);
         
@@ -874,6 +1060,11 @@
                 console.error('Error in pickWinner click handler:', error);
                 logDebug('Error in pickWinner click handler', error.message);
             }
+        });
+        
+        // Network warning click handler - attempt to switch networks
+        networkWarning.addEventListener('click', async () => {
+            await switchNetwork();
         });
         
         // Check if MetaMask is already connected
